@@ -1,0 +1,899 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AICTE Complaint Monitoring Dashboard - SIH 2026</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            teal: '#0F766E',
+                            soft: '#E6F4F2',
+                            bg: '#F5F7FA',
+                            amber: '#D97706',
+                            red: '#DC2626',
+                            green: '#16A34A',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #F5F7FA; color: #1F2937; }
+    </style>
+</head>
+<body class="bg-[#F5F7FA] min-h-screen text-gray-800 flex flex-col">
+
+    <!-- AUTH & ROLE SWITCHER BANNER -->
+    <div id="auth-banner" class="bg-slate-900 text-white px-6 py-3 flex items-center justify-between shadow-md">
+        <div class="flex items-center space-x-3">
+            <span class="bg-[#0F766E] text-xs font-semibold px-2.5 py-1 rounded">SIH 2026 DEMO (SIH26264)</span>
+            <span class="text-sm font-medium">AICTE Grievance & Complaints Monitoring System</span>
+        </div>
+        <div class="flex items-center space-x-3 text-sm">
+            <span>Switch Role:</span>
+            <button onclick="switchRole('officer')" id="btn-role-officer" class="px-3 py-1 rounded bg-[#0F766E] font-medium transition">Officer (Rajesh Verma)</button>
+            <button onclick="switchRole('student')" id="btn-role-student" class="px-3 py-1 rounded bg-slate-700 font-medium transition">Student (Aarav Sharma)</button>
+        </div>
+    </div>
+
+    <!-- MAIN APP CONTAINER -->
+    <div id="app" class="flex-1 flex flex-col"></div>
+
+    <!-- FEEDBACK FLOATING BUTTON -->
+    <div class="fixed bottom-6 right-6 z-50">
+        <button onclick="toggleFeedback()" class="bg-[#0F766E] text-white p-3.5 rounded-full shadow-lg hover:bg-teal-800 transition flex items-center space-x-2 text-sm font-medium">
+            <i data-lucide="message-square" class="w-5 h-5"></i>
+            <span>Feedback</span>
+        </button>
+    </div>
+
+    <!-- FEEDBACK MODAL -->
+    <div id="feedback-modal" class="fixed inset-0 bg-black/40 z-50 hidden flex items-center justify-center">
+        <div class="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl border border-gray-100">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-lg font-semibold text-gray-900">Send System Feedback</h3>
+                <button onclick="toggleFeedback()" class="text-gray-400 hover:text-gray-600"><i data-lucide="x" class="w-5 h-5"></i></button>
+            </div>
+            <p class="text-xs text-gray-500 mb-4">Help us improve the AICTE grievance handling workflow.</p>
+            <textarea id="feedback-text" rows="4" class="w-full border border-gray-200 rounded-xl p-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#0F766E]" placeholder="Enter your comments or suggestions here..."></textarea>
+            <div class="mt-4 flex justify-end space-x-2">
+                <button onclick="toggleFeedback()" class="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg">Cancel</button>
+                <button onclick="submitFeedback()" class="px-4 py-2 text-sm bg-[#0F766E] text-white rounded-lg hover:bg-teal-800 font-medium">Submit Feedback</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- JAVASCRIPT APPLICATION LOGIC -->
+    <script>
+        let currentRole = 'officer';
+        let currentTab = 'overview';
+        let studentTab = 'my-complaints';
+        let selectedCaseId = null;
+        let isFeedbackOpen = false;
+
+        // Chart View States for Infographics
+        let chartViews = {
+            trend: 'bar', // 'bar', 'pie', 'area'
+            status: 'pie', // 'pie', 'bar', 'donut'
+            category: 'bar' // 'bar', 'pie'
+        };
+
+        const stateData = {
+            officer: {
+                name: "Rajesh Verma",
+                bureau: "Regulation Bureau",
+                region: "Regional Office Bhopal, Madhya Pradesh",
+                stats: { pending: 12, processing: 28, verification: 7, risk: 4 }
+            },
+            student: {
+                name: "Aarav Sharma",
+                college: "Malwa Institute of Technology, Indore",
+                aicteId: "AICTE-MP-0492"
+            },
+            cases: [
+                { id: "AICTE-2026-000123", college: "Malwa Institute of Technology, Indore", aicteId: "AICTE-MP-0492", category: "Hostel", bureau: "Regulation Bureau", officer: "Rajesh Verma", received: "2026-10-10", sla: "3 days left", status: "Under processing", priority: "High", priorityReason: "Repeat complaint within 7 days", isRepeat: true, isHotspot: true, description: "Unsanitary drinking water coolers and broken door latches in Block C hostel for past two weeks.", complainant: "Aarav Sharma", timeline: [{ actor: "System", action: "Received", note: "Auto-routed to Regulation Bureau", time: "2026-10-10" }, { actor: "Rajesh Verma", action: "Taken", note: "SLA timer initiated (15 days)", time: "2026-10-11" }] },
+                { id: "AICTE-2026-000124", college: "Acropolis Institute, Indore", aicteId: "AICTE-MP-0311", category: "Fee fraud", bureau: "Fee Regulation", officer: "S. K. Mehta", received: "2026-10-12", sla: "7 days left", status: "Pending", priority: "Medium", priorityReason: "SLA at risk", isRepeat: false, isHotspot: false, description: "College charging arbitrary development fees outside approved fee structure.", complainant: "Priya Singh", timeline: [{ actor: "System", action: "Received", note: "Auto-routed to Fee Regulation", time: "2026-10-12" }] },
+                { id: "AICTE-2026-000125", college: "LNCT University, Bhopal", aicteId: "AICTE-MP-0182", category: "Faculty shortage", bureau: "Regulation Bureau", officer: "Rajesh Verma", received: "2026-10-14", sla: "1 day left (At Risk)", status: "Pending verification", priority: "High", priorityReason: "SLA at risk", isRepeat: false, isHotspot: true, description: "Only 1 professor for 120 students in Advanced Data Structures course.", complainant: "Rohan Patel", proof: "faculty_audit_report.pdf", timeline: [{ actor: "Rajesh Verma", action: "Mark Solved", note: "Uploaded faculty deployment compliance report.", time: "2026-10-25" }] },
+                { id: "AICTE-2026-000126", college: "SGSITS, Indore", aicteId: "AICTE-MP-0012", category: "Infrastructure", bureau: "PGRC", officer: "Amit Joshi", received: "2026-10-05", sla: "Breached", status: "Solved", priority: "Low", priorityReason: "Standard queue", isRepeat: false, isHotspot: false, description: "Laboratory oscilloscope calibration expired across ECE department.", complainant: "Neha Gupta", timeline: [{ actor: "Amit Joshi", action: "Solved", note: "Calibration certificates verified.", time: "2026-10-20" }] }
+            ],
+            districts: [
+                { name: "Indore", colleges: 42, open: 14, amber: 5, red: 2 },
+                { name: "Bhopal", colleges: 38, open: 12, amber: 3, red: 1 },
+                { name: "Gwalior", colleges: 24, open: 8, amber: 2, red: 0 },
+                { name: "Jabalpur", colleges: 22, open: 6, amber: 1, red: 0 },
+                { name: "Ujjain", colleges: 15, open: 4, amber: 1, red: 0 }
+            ],
+            overlaps: [
+                { id: 1, title: "Same college, same issue, also with PGRC", case1: "AICTE-2026-000123", case2: "AICTE-2026-000199", college: "Malwa Institute of Technology, Indore", category: "Hostel", linked: false }
+            ]
+        };
+
+        function switchRole(role) {
+            currentRole = role;
+            if (role === 'officer') {
+                document.getElementById('btn-role-officer').className = "px-3 py-1 rounded bg-[#0F766E] font-medium transition shadow";
+                document.getElementById('btn-role-student').className = "px-3 py-1 rounded bg-slate-700 font-medium transition opacity-70 hover:opacity-100";
+            } else {
+                document.getElementById('btn-role-student').className = "px-3 py-1 rounded bg-[#0F766E] font-medium transition shadow";
+                document.getElementById('btn-role-officer').className = "px-3 py-1 rounded bg-slate-700 font-medium transition opacity-70 hover:opacity-100";
+            }
+            render();
+        }
+
+        function setOfficerTab(tab) {
+            currentTab = tab;
+            render();
+        }
+
+        function setStudentTab(tab) {
+            studentTab = tab;
+            render();
+        }
+
+        function setChartView(chartKey, type) {
+            chartViews[chartKey] = type;
+            render();
+        }
+
+        function openDrawer(caseId) {
+            selectedCaseId = caseId;
+            render();
+        }
+
+        function closeDrawer() {
+            selectedCaseId = null;
+            render();
+        }
+
+        function toggleFeedback() {
+            isFeedbackOpen = !isFeedbackOpen;
+            const modal = document.getElementById('feedback-modal');
+            if (isFeedbackOpen) modal.classList.remove('hidden');
+            else modal.classList.add('hidden');
+        }
+
+        function submitFeedback() {
+            const text = document.getElementById('feedback-text').value;
+            if (!text) return alert('Please enter some feedback.');
+            alert('Thank you! Your feedback has been submitted to the AICTE system.');
+            document.getElementById('feedback-text').value = '';
+            toggleFeedback();
+        }
+
+        function simulatePortalComplaint() {
+            const newId = `AICTE-2026-000${Math.floor(100 + Math.random() * 900)}`;
+            stateData.cases.unshift({
+                id: newId,
+                college: "Malwa Institute of Technology, Indore",
+                aicteId: "AICTE-MP-0492",
+                category: "Hostel",
+                bureau: "Regulation Bureau",
+                officer: "Unassigned",
+                received: new Date().toISOString().split('T')[0],
+                sla: "15 days left",
+                status: "Pending",
+                priority: "High",
+                priorityReason: "New portal grievance",
+                isRepeat: true,
+                isHotspot: true,
+                description: "Simulated portal grievance regarding cafeteria sanitation and water supply.",
+                complainant: "Aarav Sharma",
+                timeline: [{ actor: "System", action: "Received", note: "Auto-routed to Regulation Bureau from Portal", time: new Date().toLocaleString() }]
+            });
+            alert(`Portal complaint simulated successfully! Created Case ID: ${newId}`);
+            render();
+        }
+
+        function takeCase(id) {
+            const c = stateData.cases.find(x => x.id === id);
+            if (c) {
+                c.status = "Under processing";
+                c.officer = "Rajesh Verma";
+                c.timeline.push({ actor: "Rajesh Verma", action: "Taken", note: "SLA timer started.", time: new Date().toLocaleString() });
+                render();
+            }
+        }
+
+        function solveCase(id) {
+            const note = prompt("Enter resolution notes and proof details:");
+            if (!note) return;
+            const c = stateData.cases.find(x => x.id === id);
+            if (c) {
+                c.status = "Pending verification";
+                c.proof = "resolution_proof.pdf";
+                c.timeline.push({ actor: "Rajesh Verma", action: "Mark Solved", note: note, time: new Date().toLocaleString() });
+                render();
+            }
+        }
+
+        function studentVerify(id, action) {
+            const c = stateData.cases.find(x => x.id === id);
+            if (!c) return;
+            if (action === 'confirm') {
+                c.status = "Solved";
+                c.timeline.push({ actor: "Aarav Sharma", action: "Confirmed", note: "Student verified and closed case.", time: new Date().toLocaleString() });
+                alert("Case confirmed and closed successfully!");
+            } else {
+                const reason = prompt("Please provide a reason for rejection:");
+                if (!reason) return;
+                c.status = "Under processing";
+                c.timeline.push({ actor: "Aarav Sharma", action: "Rejected", note: `Reason: ${reason}`, time: new Date().toLocaleString() });
+                alert("Case reopened and sent back to officer.");
+            }
+            render();
+        }
+
+        function render() {
+            const app = document.getElementById('app');
+            if (currentRole === 'officer') {
+                app.innerHTML = renderOfficerShell();
+            } else {
+                app.innerHTML = renderStudentShell();
+            }
+            lucide.createIcons();
+        }
+
+        function renderOfficerShell() {
+            return `
+                <div class="flex flex-1">
+                    <aside class="w-64 bg-white border-r border-gray-200 flex flex-col justify-between p-4 shadow-sm">
+                        <div>
+                            <div class="mb-6 px-2">
+                                <h1 class="font-bold text-gray-900 text-base">AICTE Grievance Desk</h1>
+                                <p class="text-xs text-gray-500">Officer Portal (SIH 2026)</p>
+                            </div>
+                            <div class="mb-4">
+                                <button onclick="openNextPriority()" class="w-full bg-[#0F766E] text-white py-2.5 px-4 rounded-xl text-sm font-medium hover:bg-teal-800 transition shadow-sm flex items-center justify-center space-x-2">
+                                    <i data-lucide="zap" class="w-4 h-4"></i>
+                                    <span>Open next priority case</span>
+                                </button>
+                            </div>
+                            <nav class="space-y-1">
+                                ${sidebarNavItem('overview', 'Overview', 'layout-dashboard')}
+                                ${sidebarNavItem('complaints', 'Complaints', 'file-text')}
+                                ${sidebarNavItem('priority', 'Priority list', 'list-ordered')}
+                                ${sidebarNavItem('colleges', 'Colleges', 'graduation-cap')}
+                                ${sidebarNavItem('overlaps', 'Overlaps', 'git-pull-request')}
+                                ${sidebarNavItem('officers', 'Officers (Action history)', 'users')}
+                                ${sidebarNavItem('reports', 'Reports', 'bar-chart-3')}
+                                ${sidebarNavItem('settings', 'Settings', 'settings')}
+                            </nav>
+                        </div>
+                        <div class="pt-4 border-t border-gray-100 text-xs text-gray-500 px-2">
+                            <p class="font-medium text-gray-800">Rajesh Verma</p>
+                            <p>Regulation Bureau, Bhopal</p>
+                        </div>
+                    </aside>
+
+                    <div class="flex-1 flex flex-col min-w-0">
+                        <header class="h-16 bg-white border-b border-gray-200 px-8 flex items-center justify-between shadow-sm">
+                            <div class="flex items-center space-x-4 w-96">
+                                <div class="relative w-full">
+                                    <i data-lucide="search" class="w-4 h-4 absolute left-3 top-3 text-gray-400"></i>
+                                    <input type="text" placeholder="Search case ID, college or AICTE ID..." class="w-full pl-9 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#0F766E]">
+                                </div>
+                            </div>
+                            <div class="flex items-center space-x-4">
+                                <button onclick="simulatePortalComplaint()" class="text-xs bg-[#E6F4F2] text-[#0F766E] font-medium px-3 py-1.5 rounded-lg hover:bg-teal-100 transition">
+                                    + Simulate Portal Complaint
+                                </button>
+                                <div class="relative">
+                                    <button class="p-2 text-gray-500 hover:text-gray-700 relative">
+                                        <i data-lucide="bell" class="w-5 h-5"></i>
+                                        <span class="absolute top-1 right-1 w-2 h-2 bg-red-600 rounded-full"></span>
+                                    </button>
+                                </div>
+                            </div>
+                        </header>
+
+                        <main class="flex-1 p-8 overflow-y-auto relative">
+                            ${renderOfficerCurrentPage()}
+                        </main>
+                    </div>
+                </div>
+                ${selectedCaseId ? renderCaseDrawer() : ''}
+            `;
+        }
+
+        function sidebarNavItem(id, label, icon) {
+            const active = currentTab === id;
+            return `
+                <button onclick="setOfficerTab('${id}')" class="w-full flex items-center space-x-3 px-3 py-2.5 rounded-xl text-sm font-medium transition ${active ? 'bg-[#E6F4F2] text-[#0F766E]' : 'text-gray-600 hover:bg-gray-50' }">
+                    <i data-lucide="${icon}" class="w-4 h-4"></i>
+                    <span>${label}</span>
+                </button>
+            `;
+        }
+
+        function openNextPriority() {
+            const high = stateData.cases.find(c => c.status !== 'Solved');
+            if (high) openDrawer(high.id);
+            else alert('No pending priority cases found.');
+        }
+
+        function renderOfficerCurrentPage() {
+            switch(currentTab) {
+                case 'overview': return renderOverviewPage();
+                case 'complaints': return renderComplaintsPage();
+                case 'priority': return renderPriorityPage();
+                case 'colleges': return renderCollegesPage();
+                case 'overlaps': return renderOverlapsPage();
+                case 'officers': return renderOfficersPage();
+                case 'reports': return renderReportsPage();
+                case 'settings': return renderSettingsPage();
+                default: return renderOverviewPage();
+            }
+        }
+
+        function renderOverviewPage() {
+            return `
+                <div class="space-y-6">
+                    <!-- Global Filter Bar -->
+                    <div class="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex flex-wrap items-center gap-4">
+                        <select class="bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 text-sm"><option>All Bureaus</option><option>Regulation Bureau</option></select>
+                        <select class="bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 text-sm"><option>All Districts (Madhya Pradesh)</option><option>Indore</option><option>Bhopal</option></select>
+                        <select class="bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 text-sm"><option>All Categories</option><option>Hostel</option><option>Fee fraud</option></select>
+                        <input type="date" class="bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 text-sm" value="2026-10-01">
+                    </div>
+
+                    <!-- Row 1: KPI Cards -->
+                    <div class="grid grid-cols-4 gap-6">
+                        <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+                            <div class="flex items-center justify-between mb-2">
+                                <span class="text-xs text-gray-500 font-medium">Pending (New)</span>
+                                <div class="w-8 h-8 rounded-xl bg-gray-100 flex items-center justify-center text-gray-600"><i data-lucide="clock" class="w-4 h-4"></i></div>
+                            </div>
+                            <div class="text-3xl font-bold text-gray-900">12</div>
+                        </div>
+                        <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+                            <div class="flex items-center justify-between mb-2">
+                                <span class="text-xs text-gray-500 font-medium">Under processing</span>
+                                <div class="w-8 h-8 rounded-xl bg-[#E6F4F2] flex items-center justify-center text-[#0F766E]"><i data-lucide="loader" class="w-4 h-4"></i></div>
+                            </div>
+                            <div class="text-3xl font-bold text-gray-900">28</div>
+                            <span class="text-xs text-amber-600 mt-1 block">3 close to SLA deadline</span>
+                        </div>
+                        <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+                            <div class="flex items-center justify-between mb-2">
+                                <span class="text-xs text-gray-500 font-medium">Pending verification</span>
+                                <div class="w-8 h-8 rounded-xl bg-blue-50 flex items-center justify-center text-blue-600"><i data-lucide="shield-alert" class="w-4 h-4"></i></div>
+                            </div>
+                            <div class="text-3xl font-bold text-gray-900">7</div>
+                        </div>
+                        <div class="bg-[#0F766E] text-white p-6 rounded-2xl shadow-sm">
+                            <div class="flex items-center justify-between mb-2">
+                                <span class="text-xs text-teal-100 font-medium">SLA at risk / Breached</span>
+                                <div class="w-8 h-8 rounded-xl bg-white/10 flex items-center justify-center text-white"><i data-lucide="alert-triangle" class="w-4 h-4"></i></div>
+                            </div>
+                            <div class="text-3xl font-bold">4</div>
+                            <span class="text-xs text-teal-100 mt-1 block">Requires immediate officer action</span>
+                        </div>
+                    </div>
+
+                    <!-- Row 2: Wide interactive chart + Priority Queue -->
+                    <div class="grid grid-cols-3 gap-6">
+                        <div class="col-span-2 bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex flex-col justify-between">
+                            <div class="flex items-center justify-between mb-4">
+                                <h3 class="font-semibold text-gray-900 text-base">Complaints over time (Infographic View)</h3>
+                                <div class="flex items-center space-x-2">
+                                    <button onclick="setChartView('trend', 'bar')" class="px-2.5 py-1 text-xs rounded-lg font-medium ${chartViews.trend === 'bar' ? 'bg-[#0F766E] text-white' : 'bg-gray-100 text-gray-600'}">Bar</button>
+                                    <button onclick="setChartView('trend', 'pie')" class="px-2.5 py-1 text-xs rounded-lg font-medium ${chartViews.trend === 'pie' ? 'bg-[#0F766E] text-white' : 'bg-gray-100 text-gray-600'}">Pie</button>
+                                    <button onclick="setChartView('trend', 'area')" class="px-2.5 py-1 text-xs rounded-lg font-medium ${chartViews.trend === 'area' ? 'bg-[#0F766E] text-white' : 'bg-gray-100 text-gray-600'}">Area</button>
+                                </div>
+                            </div>
+                            <div class="h-64 flex items-center justify-center">
+                                ${renderTrendChart()}
+                            </div>
+                        </div>
+
+                        <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex flex-col justify-between">
+                            <div class="flex items-center justify-between mb-4">
+                                <h3 class="font-semibold text-gray-900 text-base">Priority list (Top 6)</h3>
+                                <button onclick="setOfficerTab('priority')" class="text-xs text-[#0F766E] font-medium hover:underline">View all</button>
+                            </div>
+                            <div class="space-y-3">
+                                ${stateData.cases.slice(0, 3).map(c => `
+                                    <div onclick="openDrawer('${c.id}')" class="p-3 bg-gray-50 hover:bg-gray-100 rounded-xl cursor-pointer transition flex items-center justify-between">
+                                        <div>
+                                            <div class="flex items-center space-x-2">
+                                                <span class="text-xs font-bold text-red-600 uppercase">${c.priority}</span>
+                                                ${c.isRepeat ? '<span class="text-[10px] bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded">Repeat</span>' : ''}
+                                            </div>
+                                            <p class="text-xs font-semibold text-gray-800 mt-0.5 truncate w-48">${c.college}</p>
+                                        </div>
+                                        <span class="text-xs text-gray-500">${c.sla}</span>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Row 3: Three Colorful Analytics Cards -->
+                    <div class="grid grid-cols-3 gap-6">
+                        <!-- Card 1: Status Split -->
+                        <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex flex-col justify-between">
+                            <div class="flex items-center justify-between mb-3">
+                                <h3 class="font-semibold text-gray-900 text-sm">Status Split (Donut / Pie)</h3>
+                                <div class="flex space-x-1">
+                                    <button onclick="setChartView('status', 'pie')" class="px-2 py-0.5 text-[10px] rounded ${chartViews.status === 'pie' ? 'bg-[#0F766E] text-white' : 'bg-gray-100 text-gray-600'}">Pie</button>
+                                    <button onclick="setChartView('status', 'bar')" class="px-2 py-0.5 text-[10px] rounded ${chartViews.status === 'bar' ? 'bg-[#0F766E] text-white' : 'bg-gray-100 text-gray-600'}">Bar</button>
+                                </div>
+                            </div>
+                            <div class="h-48 flex items-center justify-center">
+                                ${renderStatusChart()}
+                            </div>
+                        </div>
+
+                        <!-- Card 2: Complaints by Category -->
+                        <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex flex-col justify-between">
+                            <div class="flex items-center justify-between mb-3">
+                                <h3 class="font-semibold text-gray-900 text-sm">Complaints by Category</h3>
+                                <span class="text-[10px] text-gray-400">Horizontal Bars</span>
+                            </div>
+                            <div class="space-y-2.5">
+                                <div>
+                                    <div class="flex justify-between text-xs mb-1"><span class="font-medium text-gray-700">Hostel</span><span class="text-gray-500">42 cases</span></div>
+                                    <div class="w-full bg-gray-100 h-2.5 rounded-full overflow-hidden"><div class="bg-[#0F766E] h-full rounded-full" style="width: 85%"></div></div>
+                                </div>
+                                <div>
+                                    <div class="flex justify-between text-xs mb-1"><span class="font-medium text-gray-700">Fee Fraud</span><span class="text-gray-500">28 cases</span></div>
+                                    <div class="w-full bg-gray-100 h-2.5 rounded-full overflow-hidden"><div class="bg-[#D97706] h-full rounded-full" style="width: 60%"></div></div>
+                                </div>
+                                <div>
+                                    <div class="flex justify-between text-xs mb-1"><span class="font-medium text-gray-700">Faculty Shortage</span><span class="text-gray-500">19 cases</span></div>
+                                    <div class="w-full bg-gray-100 h-2.5 rounded-full overflow-hidden"><div class="bg-[#3B82F6] h-full rounded-full" style="width: 40%"></div></div>
+                                </div>
+                                <div>
+                                    <div class="flex justify-between text-xs mb-1"><span class="font-medium text-gray-700">Infrastructure</span><span class="text-gray-500">14 cases</span></div>
+                                    <div class="w-full bg-gray-100 h-2.5 rounded-full overflow-hidden"><div class="bg-[#8B5CF6] h-full rounded-full" style="width: 30%"></div></div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Card 3: SLA Health Bar -->
+                        <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex flex-col justify-between">
+                            <div class="flex items-center justify-between mb-3">
+                                <h3 class="font-semibold text-gray-900 text-sm">SLA Compliance Health</h3>
+                                <span class="text-[10px] text-green-600 font-semibold bg-green-50 px-2 py-0.5 rounded">82% On Time</span>
+                            </div>
+                            <div class="space-y-4 my-auto">
+                                <div class="w-full flex h-4 rounded-full overflow-hidden shadow-inner">
+                                    <div class="bg-green-500 h-full" style="width: 65%" title="On Time: 65%"></div>
+                                    <div class="bg-amber-400 h-full" style="width: 22%" title="At Risk: 22%"></div>
+                                    <div class="bg-red-500 h-full" style="width: 13%" title="Breached: 13%"></div>
+                                </div>
+                                <div class="flex justify-between text-xs text-gray-600 font-medium pt-1">
+                                    <span class="flex items-center"><span class="w-2.5 h-2.5 rounded-full bg-green-500 mr-1.5"></span> On Time (65%)</span>
+                                    <span class="flex items-center"><span class="w-2.5 h-2.5 rounded-full bg-amber-400 mr-1.5"></span> At Risk (22%)</span>
+                                    <span class="flex items-center"><span class="w-2.5 h-2.5 rounded-full bg-red-500 mr-1.5"></span> Breached (13%)</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        // Render Infographic Trend Chart based on selected view mode
+        function renderTrendChart() {
+            const data = [
+                { label: 'W1', val: 45, color: '#0F766E' },
+                { label: 'W2', val: 60, color: '#14B8A6' },
+                { label: 'W3', val: 55, color: '#0D9488' },
+                { label: 'W4', val: 80, color: '#F59E0B' },
+                { label: 'W5', val: 95, color: '#3B82F6' },
+                { label: 'W6', val: 110, color: '#8B5CF6' },
+                { label: 'W7', val: 85, color: '#EC4899' }
+            ];
+
+            if (chartViews.trend === 'bar') {
+                return `
+                    <div class="w-full h-full flex items-end justify-between space-x-3 px-4 pt-4 border-b border-gray-100">
+                        ${data.map(d => `
+                            <div class="w-full flex flex-col items-center gap-2 group">
+                                <div class="text-[10px] text-gray-500 opacity-0 group-hover:opacity-100 transition">${d.val}</div>
+                                <div class="w-full rounded-t-lg transition hover:brightness-110 shadow-sm" style="height: ${d.val}px; background-color: ${d.color};"></div>
+                                <span class="text-[10px] text-gray-500 font-medium">${d.label}</span>
+                            </div>
+                        `).join('')}
+                    </div>
+                `;
+            } else if (chartViews.trend === 'pie') {
+                return `
+                    <div class="flex items-center space-x-8">
+                        <svg class="w-36 h-36 transform -rotate-90" viewBox="0 0 32 32">
+                            <circle cx="16" cy="16" r="14" fill="none" stroke="#E2E8F0" stroke-width="4"></circle>
+                            <circle cx="16" cy="16" r="14" fill="none" stroke="#0F766E" stroke-width="4" stroke-dasharray="40 100"></circle>
+                            <circle cx="16" cy="16" r="14" fill="none" stroke="#F59E0B" stroke-width="4" stroke-dasharray="30 100" stroke-dashoffset="-40"></circle>
+                            <circle cx="16" cy="16" r="14" fill="none" stroke="#8B5CF6" stroke-width="4" stroke-dasharray="30 100" stroke-dashoffset="-70"></circle>
+                        </svg>
+                        <div class="space-y-1.5 text-xs">
+                            <div class="flex items-center space-x-2"><span class="w-3 h-3 rounded-full bg-[#0F766E]"></span><span class="text-gray-700 font-medium">Weeks 1-3 (40%)</span></div>
+                            <div class="flex items-center space-x-2"><span class="w-3 h-3 rounded-full bg-[#F59E0B]"></span><span class="text-gray-700 font-medium">Weeks 4-5 (30%)</span></div>
+                            <div class="flex items-center space-x-2"><span class="w-3 h-3 rounded-full bg-[#8B5CF6]"></span><span class="text-gray-700 font-medium">Weeks 6-7 (30%)</span></div>
+                        </div>
+                    </div>
+                `;
+            } else {
+                return `
+                    <div class="w-full h-full flex items-center px-4">
+                        <svg class="w-full h-48 overflow-visible" viewBox="0 0 300 120">
+                            <defs>
+                                <linearGradient id="trendGrad" x1="0" y1="0" x2="0" y2="1">
+                                    <stop offset="0%" stop-color="#0F766E" stop-opacity="0.4"/>
+                                    <stop offset="100%" stop-color="#0F766E" stop-opacity="0.0"/>
+                                </linearGradient>
+                            </defs>
+                            <path d="M 0 90 Q 50 40, 100 60 T 200 20 T 300 50 L 300 120 L 0 120 Z" fill="url(#trendGrad)"></path>
+                            <path d="M 0 90 Q 50 40, 100 60 T 200 20 T 300 50" fill="none" stroke="#0F766E" stroke-width="3"></path>
+                            <circle cx="100" cy="60" r="4" fill="#0F766E"></circle>
+                            <circle cx="200" cy="20" r="4" fill="#0F766E"></circle>
+                        </svg>
+                    </div>
+                `;
+            }
+        }
+
+        // Render Infographic Status Donut / Bar Chart
+        function renderStatusChart() {
+            if (chartViews.status === 'pie') {
+                return `
+                    <div class="flex items-center space-x-6">
+                        <div class="relative w-36 h-36 flex items-center justify-center">
+                            <svg class="w-full h-full transform -rotate-90" viewBox="0 0 36 36">
+                                <path class="text-gray-200" stroke-width="4" stroke="currentColor" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                                <path class="text-[#0F766E]" stroke-dasharray="50, 100" stroke-width="4" stroke-linecap="round" stroke="currentColor" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                            </svg>
+                            <div class="absolute text-center">
+                                <span class="text-xl font-bold text-gray-900">84%</span>
+                                <span class="text-[10px] text-gray-500 block">Resolved</span>
+                            </div>
+                        </div>
+                        <div class="space-y-1.5 text-xs">
+                            <div class="flex items-center space-x-2"><span class="w-2.5 h-2.5 rounded-full bg-[#0F766E]"></span><span class="text-gray-700">Solved (84)</span></div>
+                            <div class="flex items-center space-x-2"><span class="w-2.5 h-2.5 rounded-full bg-amber-500"></span><span class="text-gray-700">Under Proc. (28)</span></div>
+                            <div class="flex items-center space-x-2"><span class="w-2.5 h-2.5 rounded-full bg-blue-500"></span><span class="text-gray-700">Pending (12)</span></div>
+                        </div>
+                    </div>
+                `;
+            } else {
+                return `
+                    <div class="w-full space-y-2 px-2">
+                        <div>
+                            <div class="flex justify-between text-xs mb-1 font-medium"><span class="text-gray-700">Solved</span><span class="text-green-600 font-bold">84</span></div>
+                            <div class="w-full bg-gray-100 h-3 rounded-full overflow-hidden"><div class="bg-green-600 h-full rounded-full" style="width: 70%"></div></div>
+                        </div>
+                        <div>
+                            <div class="flex justify-between text-xs mb-1 font-medium"><span class="text-gray-700">Under Processing</span><span class="text-[#0F766E] font-bold">28</span></div>
+                            <div class="w-full bg-gray-100 h-3 rounded-full overflow-hidden"><div class="bg-[#0F766E] h-full rounded-full" style="width: 45%"></div></div>
+                        </div>
+                        <div>
+                            <div class="flex justify-between text-xs mb-1 font-medium"><span class="text-gray-700">Pending</span><span class="text-amber-600 font-bold">12</span></div>
+                            <div class="w-full bg-gray-100 h-3 rounded-full overflow-hidden"><div class="bg-amber-500 h-full rounded-full" style="width: 25%"></div></div>
+                        </div>
+                    </div>
+                `;
+            }
+        }
+
+        // COMPLAINTS PAGE
+        function renderComplaintsPage() {
+            return `
+                <div class="space-y-6">
+                    <div class="flex items-center justify-between">
+                        <div class="flex space-x-2 border-b border-gray-200 pb-2">
+                            <button class="px-4 py-2 text-sm font-medium text-[#0F766E] border-b-2 border-[#0F766E]">Pending <span class="ml-1 text-xs bg-gray-100 px-2 py-0.5 rounded-full text-gray-600">12</span></button>
+                            <button class="px-4 py-2 text-sm font-medium text-gray-500 hover:text-gray-900">Under processing <span class="ml-1 text-xs bg-gray-100 px-2 py-0.5 rounded-full text-gray-600">28</span></button>
+                            <button class="px-4 py-2 text-sm font-medium text-gray-500 hover:text-gray-900">Pending verification <span class="ml-1 text-xs bg-gray-100 px-2 py-0.5 rounded-full text-gray-600">7</span></button>
+                            <button class="px-4 py-2 text-sm font-medium text-gray-500 hover:text-gray-900">Solved <span class="ml-1 text-xs bg-gray-100 px-2 py-0.5 rounded-full text-gray-600">84</span></button>
+                        </div>
+                    </div>
+
+                    <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+                        <table class="w-full text-left border-collapse">
+                            <thead>
+                                <tr class="bg-gray-50 border-b border-gray-200 text-xs font-semibold text-gray-500">
+                                    <th class="p-4">Case ID</th>
+                                    <th class="p-4">College</th>
+                                    <th class="p-4">Category</th>
+                                    <th class="p-4">Bureau</th>
+                                    <th class="p-4">Assigned Officer</th>
+                                    <th class="p-4">Date Received</th>
+                                    <th class="p-4">SLA Remaining</th>
+                                    <th class="p-4">Status</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-gray-100 text-sm">
+                                ${stateData.cases.map(c => `
+                                    <tr onclick="openDrawer('${c.id}')" class="hover:bg-gray-50 cursor-pointer transition">
+                                        <td class="p-4 font-semibold text-[#0F766E]">${c.id}</td>
+                                        <td class="p-4 font-medium text-gray-900">${c.college}</td>
+                                        <td class="p-4 text-gray-600">${c.category}</td>
+                                        <td class="p-4 text-gray-600">${c.bureau}</td>
+                                        <td class="p-4 text-gray-600">${c.officer}</td>
+                                        <td class="p-4 text-gray-500">${c.received}</td>
+                                        <td class="p-4"><span class="bg-amber-50 text-amber-700 px-2.5 py-1 rounded-full text-xs font-medium">${c.sla}</span></td>
+                                        <td class="p-4"><span class="bg-teal-50 text-teal-800 px-2.5 py-1 rounded-full text-xs font-medium">${c.status}</span></td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderPriorityPage() {
+            return `
+                <div class="space-y-6">
+                    <h2 class="text-xl font-bold text-gray-900">Priority Cases Queue</h2>
+                    <div class="space-y-4">
+                        ${stateData.cases.map(c => `
+                            <div class="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 flex items-center justify-between">
+                                <div class="space-y-1">
+                                    <div class="flex items-center space-x-3">
+                                        <span class="font-bold text-[#0F766E]">${c.id}</span>
+                                        <span class="px-2 py-0.5 rounded text-xs font-bold bg-red-100 text-red-700">${c.priority} Priority</span>
+                                        <span class="text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded" title="${c.priorityReason}">Why: ${c.priorityReason}</span>
+                                        ${c.isRepeat ? '<span class="text-xs bg-amber-100 text-amber-800 px-2 py-0.5 rounded">Repeat</span>' : ''}
+                                    </div>
+                                    <p class="text-sm font-semibold text-gray-900">${c.college} <span class="text-xs text-gray-400 font-normal">(${c.aicteId})</span></p>
+                                    <p class="text-xs text-gray-600">${c.description}</p>
+                                </div>
+                                <div class="flex items-center space-x-3">
+                                    <button onclick="takeCase('${c.id}')" class="px-4 py-2 bg-[#0F766E] text-white text-xs font-medium rounded-xl hover:bg-teal-800 transition">Taken</button>
+                                    <button onclick="solveCase('${c.id}')" class="px-4 py-2 bg-gray-100 text-gray-700 text-xs font-medium rounded-xl hover:bg-gray-200 transition">Solved</button>
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderCollegesPage() {
+            return `
+                <div class="space-y-6">
+                    <div class="text-sm text-gray-500">Madhya Pradesh > All districts</div>
+                    <h2 class="text-xl font-bold text-gray-900">District-wise Institution Overview</h2>
+                    <div class="grid grid-cols-3 gap-6">
+                        ${stateData.districts.map(d => `
+                            <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 hover:shadow-md transition">
+                                <h3 class="text-lg font-bold text-gray-900">${d.name} District</h3>
+                                <p class="text-xs text-gray-500 mt-1">${d.colleges} Affiliated Colleges</p>
+                                <div class="mt-4 flex space-x-2 text-xs">
+                                    <span class="bg-teal-50 text-teal-800 px-2 py-1 rounded">Open: ${d.open}</span>
+                                    <span class="bg-amber-50 text-amber-700 px-2 py-1 rounded">Amber: ${d.amber}</span>
+                                    <span class="bg-red-50 text-red-700 px-2 py-1 rounded">Red / Hotspot: ${d.red}</span>
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderOverlapsPage() {
+            return `
+                <div class="space-y-6">
+                    <h2 class="text-xl font-bold text-gray-900">Cross-Bureau Overlap Alerts</h2>
+                    <div class="space-y-4">
+                        ${stateData.overlaps.map(o => `
+                            <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex items-center justify-between">
+                                <div>
+                                    <span class="text-xs bg-amber-100 text-amber-800 font-medium px-2 py-1 rounded">${o.title}</span>
+                                    <h4 class="text-sm font-bold text-gray-900 mt-2">${o.college}</h4>
+                                    <p class="text-xs text-gray-500 mt-0.5">Cases: <span class="font-semibold text-gray-700">${o.case1}</span> & <span class="font-semibold text-gray-700">${o.case2}</span> | Category: ${o.category}</p>
+                                </div>
+                                <button onclick="alert('Cases linked successfully!')" class="px-4 py-2 bg-[#0F766E] text-white text-xs font-medium rounded-xl hover:bg-teal-800 transition">Link cases</button>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderOfficersPage() {
+            return `
+                <div class="space-y-6">
+                    <h2 class="text-xl font-bold text-gray-900">Officer Workload & Action History</h2>
+                    <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <h3 class="font-bold text-gray-900">Rajesh Verma</h3>
+                                <p class="text-xs text-gray-500">Regulation Bureau • Regional Office Bhopal</p>
+                            </div>
+                            <div class="flex space-x-6 text-sm">
+                                <div><span class="text-gray-400 text-xs block">Solved</span><span class="font-bold text-green-600">45</span></div>
+                                <div><span class="text-gray-400 text-xs block">Processing</span><span class="font-bold text-teal-600">28</span></div>
+                                <div><span class="text-gray-400 text-xs block">Pending</span><span class="font-bold text-gray-600">12</span></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderReportsPage() {
+            return `
+                <div class="space-y-6">
+                    <div class="flex items-center justify-between">
+                        <h2 class="text-xl font-bold text-gray-900">Analytics & Export Reports</h2>
+                        <button onclick="alert('CSV Report downloaded successfully!')" class="bg-[#0F766E] text-white px-4 py-2 rounded-xl text-sm font-medium hover:bg-teal-800 transition">Export CSV</button>
+                    </div>
+                    <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 text-center py-12 text-gray-500">
+                        <i data-lucide="bar-chart" class="w-12 h-12 mx-auto text-gray-300 mb-2"></i>
+                        <p>Live preview table and filters active. Click export above to download raw compliance datasets.</p>
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderSettingsPage() {
+            return `
+                <div class="space-y-6">
+                    <h2 class="text-xl font-bold text-gray-900">System Settings (Senior Admin)</h2>
+                    <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 space-y-4">
+                        <div>
+                            <label class="text-xs font-semibold text-gray-600 block mb-1">Default SLA Days per Category</label>
+                            <input type="text" class="w-full bg-gray-50 border border-gray-200 rounded-xl p-2.5 text-sm" value="Fee fraud: 15 days, Hostel: 15 days, Ragging: 7 days">
+                        </div>
+                        <div>
+                            <label class="text-xs font-semibold text-gray-600 block mb-1">Reminder Interval (Days)</label>
+                            <input type="text" class="w-full bg-gray-50 border border-gray-200 rounded-xl p-2.5 text-sm" value="3 days">
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderCaseDrawer() {
+            const c = stateData.cases.find(x => x.id === selectedCaseId);
+            if (!c) return '';
+            return `
+                <div class="fixed inset-0 bg-black/40 z-50 flex justify-end">
+                    <div class="bg-white w-full max-w-xl h-full shadow-2xl flex flex-col justify-between p-8 overflow-y-auto">
+                        <div>
+                            <div class="flex items-center justify-between mb-6">
+                                <div>
+                                    <span class="text-xs font-bold text-[#0F766E]">${c.id}</span>
+                                    <h2 class="text-xl font-bold text-gray-900 mt-1">${c.college}</h2>
+                                    <p class="text-xs text-gray-500">AICTE ID: ${c.aicteId} | Category: ${c.category}</p>
+                                </div>
+                                <button onclick="closeDrawer()" class="p-2 text-gray-400 hover:text-gray-600 rounded-full"><i data-lucide="x" class="w-6 h-6"></i></button>
+                            </div>
+
+                            <div class="bg-gray-50 p-4 rounded-2xl mb-6 border border-gray-100">
+                                <h4 class="text-xs font-bold text-gray-700 uppercase mb-1">Complainant Statement (${c.complainant})</h4>
+                                <p class="text-sm text-gray-800">${c.description}</p>
+                            </div>
+
+                            <h3 class="text-sm font-bold text-gray-900 mb-3">Audit Trail Timeline</h3>
+                            <div class="space-y-3 mb-6">
+                                ${c.timeline.map(t => `
+                                    <div class="flex items-start space-x-3 text-xs">
+                                        <div class="w-2 h-2 rounded-full bg-[#0F766E] mt-1.5"></div>
+                                        <div>
+                                            <p class="font-semibold text-gray-900">${t.action} by ${t.actor}</p>
+                                            <p class="text-gray-600">${t.note}</p>
+                                            <span class="text-[10px] text-gray-400">${t.time}</span>
+                                        </div>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        </div>
+
+                        <div class="pt-4 border-t border-gray-100 flex items-center justify-end space-x-3">
+                            <button onclick="takeCase('${c.id}')" class="px-4 py-2.5 bg-[#0F766E] text-white text-sm font-medium rounded-xl hover:bg-teal-800 transition">Mark Taken</button>
+                            <button onclick="solveCase('${c.id}')" class="px-4 py-2.5 bg-gray-100 text-gray-700 text-sm font-medium rounded-xl hover:bg-gray-200 transition">Mark Solved</button>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderStudentShell() {
+            return `
+                <div class="flex flex-1">
+                    <aside class="w-64 bg-white border-r border-gray-200 flex flex-col justify-between p-4 shadow-sm">
+                        <div>
+                            <div class="mb-6 px-2">
+                                <h1 class="font-bold text-gray-900 text-base">Student Portal</h1>
+                                <p class="text-xs text-gray-500">Complainant View</p>
+                            </div>
+                            <nav class="space-y-1">
+                                <button onclick="setStudentTab('my-complaints')" class="w-full flex items-center space-x-3 px-3 py-2.5 rounded-xl text-sm font-medium transition ${studentTab === 'my-complaints' ? 'bg-[#E6F4F2] text-[#0F766E]' : 'text-gray-600 hover:bg-gray-50'}">
+                                    <i data-lucide="file-text" class="w-4 h-4"></i>
+                                    <span>My complaints</span>
+                                </button>
+                            </nav>
+                        </div>
+                        <div class="pt-4 border-t border-gray-100 text-xs text-gray-500 px-2">
+                            <p class="font-medium text-gray-800">Aarav Sharma</p>
+                            <p>Malwa Institute of Technology</p>
+                        </div>
+                    </aside>
+
+                    <div class="flex-1 flex flex-col min-w-0">
+                        <header class="h-16 bg-white border-b border-gray-200 px-8 flex items-center justify-between shadow-sm">
+                            <div class="flex items-center space-x-3">
+                                <span class="text-xs bg-teal-50 text-[#0F766E] px-3 py-1 rounded-full font-medium">Malwa Institute of Technology, Indore (AICTE-MP-0492)</span>
+                            </div>
+                            <button onclick="simulatePortalComplaint()" class="bg-[#0F766E] text-white px-4 py-2 rounded-xl text-sm font-medium hover:bg-teal-800 transition">
+                                Simulate portal complaint (demo)
+                            </button>
+                        </header>
+
+                        <main class="flex-1 p-8 overflow-y-auto space-y-6">
+                            <div class="bg-amber-50 border border-amber-200 p-6 rounded-2xl flex items-center justify-between">
+                                <div>
+                                    <span class="text-xs font-bold text-amber-800 uppercase tracking-wider">Action Required</span>
+                                    <h3 class="text-base font-bold text-gray-900 mt-1">Your complaint was marked solved by Regulation Bureau</h3>
+                                    <p class="text-xs text-gray-600 mt-0.5">Please review the officer's proof and confirm or reject within 7 days.</p>
+                                </div>
+                                <div class="flex space-x-3">
+                                    <button onclick="studentVerify('AICTE-2026-000125', 'confirm')" class="px-4 py-2 bg-green-600 text-white text-xs font-medium rounded-xl hover:bg-green-700 transition">Confirm</button>
+                                    <button onclick="studentVerify('AICTE-2026-000125', 'reject')" class="px-4 py-2 bg-white border border-gray-300 text-gray-700 text-xs font-medium rounded-xl hover:bg-gray-50 transition">Reject</button>
+                                </div>
+                            </div>
+
+                            <div class="grid grid-cols-3 gap-6">
+                                <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+                                    <span class="text-xs text-gray-500 font-medium">Open Complaints</span>
+                                    <div class="text-3xl font-bold text-gray-900 mt-2">2</div>
+                                </div>
+                                <div class="bg-[#E6F4F2] border border-teal-100 p-6 rounded-2xl shadow-sm">
+                                    <span class="text-xs text-[#0F766E] font-medium font-semibold">Waiting for your confirmation</span>
+                                    <div class="text-3xl font-bold text-[#0F766E] mt-2">1</div>
+                                </div>
+                                <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+                                    <span class="text-xs text-gray-500 font-medium">Solved & Closed</span>
+                                    <div class="text-3xl font-bold text-gray-900 mt-2">3</div>
+                                </div>
+                            </div>
+
+                            <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+                                <div class="p-6 border-b border-gray-100 font-bold text-gray-900">Your Filed Complaints</div>
+                                <table class="w-full text-left border-collapse">
+                                    <thead>
+                                        <tr class="bg-gray-50 border-b border-gray-200 text-xs font-semibold text-gray-500">
+                                            <th class="p-4">Case ID</th>
+                                            <th class="p-4">Category</th>
+                                            <th class="p-4">Description</th>
+                                            <th class="p-4">Status</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="divide-y divide-gray-100 text-sm">
+                                        ${stateData.cases.map(c => `
+                                            <tr class="hover:bg-gray-50">
+                                                <td class="p-4 font-semibold text-[#0F766E]">${c.id}</td>
+                                                <td class="p-4 text-gray-800">${c.category}</td>
+                                                <td class="p-4 text-gray-600 truncate max-w-xs">${c.description}</td>
+                                                <td class="p-4"><span class="bg-teal-50 text-teal-800 px-2.5 py-1 rounded-full text-xs font-medium">${c.status}</span></td>
+                                            </tr>
+                                        `).join('')}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </main>
+                    </div>
+                </div>
+            `;
+        }
+
+        window.onload = () => {
+            render();
+        };
+    </script>
+</body>
+</html>
